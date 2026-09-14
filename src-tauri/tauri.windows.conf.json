@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis"
+    ],
+    "resources": {
+      "resources/pack.tar.gz": "./",
+      "resources/pack-manifest.json": "./",
+      "runtime/": "runtime/",
+      "resources/book-assets/": "book-assets/",
+      "../ccms/ccms-app.html": "ccms/ccms-app.html"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "nsis-hooks.nsh",
+        "template": "nsis-oneclick.nsi"
+      }
+    }
+  }
+}

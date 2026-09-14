@@ -1,0 +1,359 @@
+# CalebBible
+
+**AI 에이전트 함대를 지휘하는 오케스트레이션 터미널.** macOS · Windows 크로스플랫폼.
+
+Ezer (갈렙)의 뜻: 도움, 돕는 자, 조력자
+시편에서 하나님을 “우리의 도움”이라고 표현할 때 사용되는 강한 성경적 단어입니다. 
+이 AI는 목회자를 대신하는 존재가 아니라, 목회와 말씀 사역을 곁에서 돕는 조력자라는 의미로 갈렙라고 이름을 붙였습니다
+
+이 에이전트는 한국AI융합연구원 미래학자 최윤식박사의 자비스에서 아이디어를 받아서 만들어진 터미널 멀티플렉서 + 로컬 데몬 + 관제 대시보드 + 멀티에이전트 운영체계(CalebBible 팩)가
+한 몸입니다. Claude Code·Codex 같은 CLI 에이전트 여러 개를 역할(마스터·워커·CSO·리뷰어)로
+나눠 동시에 굴리고, 서로 소켓으로 대화시키고, 비용·컨텍스트·하드웨어를 실시간 관제합니다.
+
+> 이 프로젝트의 코드는 대부분 **사람의 지휘 아래 AI 에이전트들이 작성**했습니다 —
+> 커밋 로그의 `Co-Authored-By` 체인이 그 과정의 기록입니다. 이 저장소 자체가
+> "AI 함대 오케스트레이션이 실제로 동작한다"는 실증입니다.
+
+*Read this in [English](README.en.md).*
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| **[Architecture & Philosophy](ARCHITECTURE-AND-PHILOSOPHY.md)** | 설계 철학 10명제·시스템 아키텍처·보안 모델·불변식 |
+| **[User Manual](USER-MANUAL.md)** | 설치부터 함대 운용, CLI·환경변수·프로토콜 전체 레퍼런스까지 |
+| [INSTALL.md](docs/INSTALL.md) · [INSTALL-Windows-KR.md](docs/INSTALL-Windows-KR.md) | 설치 상세 |
+| [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [NOTICE.md](NOTICE.md) | 보안 신고 · 기여 · 서드파티 귀속 |
+
+## 왜 만들었나
+
+목회자들에게 특화된 AI Agent가 있으면 좋겠다는 요청에 따라 기존의 자비스와는 달리 목회자에게 필요한 스킬을 중심으로 제작되었습니다.
+이 Agent와 기존 터미널 사용 에이전트의 다른점은 기존 터미널·멀티플렉서는 "사람이 명령을 치는 곳"입니다. AI 에이전트를 여러 개 띄우면
+곧바로 한계가 옵니다 — pane끼리 서로 말을 걸 수 없고, 에이전트가 남긴 고아 서버가 쌓여
+시스템이 마비되고, 누가 얼마나 쓰는지 보이지 않습니다. CalebBible은 그 문제들을
+1급 기능으로 해결하기 위해 처음부터 새로 작성한 독자 구현입니다.
+
+그리고 네 번째 문제 — **에이전트들을 어떻게 조직으로 묶을 것인가** — 를 내장 팩
+(CalebBible: 역할별 절대지침 + 결정론 운영 도구)으로 해결합니다.
+
+## 설계 원칙 (ABSOLUTE)
+
+1. **양방향 소켓통신** — 단방향 send + capture 폴링을 쓰지 않는다.
+   같은 소켓에 물린 모든 pane은 surface ID만 알면 서로에게 능동 push하는 **동등 노드**다.
+   `CalebBible send --surface surface:31 "..."` + `send-key Return` → 대상 pane의 **PTY stdin에 직접 주입** → 새 user turn 도착.
+   서버→클라이언트 방향은 `CalebBible events` 푸시 스트림(시퀀스 번호·재접속 이어받기).
+2. **자원 거버넌스 1급 기능** — 고아 서버 누적 → load 폭주 → 401·hang을 원천 차단하는 완화책 내장.
+3. **코어/UI 분리** — 데몬(CalebBibled)은 UI와 무관하게 동작. UI가 hang이어도 소켓 제어 채널은 항상 살아있다(OOB 회생).
+4. **fail-closed 서명** — 앱은 Tauri updater 서명, 팩은 minisign(공개키 바이너리 핀).
+   검증에 실패하면 설치·전개 자체가 거부된다.
+5. **지침과 기계의 한 몸** — 역할별 절대지침·운영 도구·스킬(CalebBible 팩)이 터미널과 함께
+   빌드·서명·배포되고, 노드 기동 시 자동 주입된다.
+
+## 설치
+
+[Releases](https://github.com/choijinyi/Ezer/releases/latest)에서 받으세요.
+받는 사람은 **데몬을 따로 설치할 필요가 없습니다** — 앱이 자동 기동하고 팩도 자동 설치됩니다.
+
+- **macOS**: `CalebBible_<버전>_aarch64.dmg` (Apple Silicon) — 드래그 설치 후 앱 실행이면 끝.
+- **Windows**: `CalebBible_<버전>_x64-setup.exe` — 데몬·CLI·런타임 동봉(자기완결 설치).
+  상세: [docs/INSTALL-Windows-KR.md](docs/INSTALL-Windows-KR.md)
+- 24/365 상시 가동(선택): `CalebBible daemon install` (launchd KeepAlive / 작업 스케줄러).
+- 외부 터미널에서 `CalebBible` 명령 쓰기: 앱 Control Center → **"셸에 CalebBible 설치"** 1클릭.
+
+### 필요한 것이 전부 함께 깔립니다
+
+| 대상 | 방식 |
+|---|---|
+| **Node.js**(+npm/npx) · Python · git · uv | 설치본에 **동봉** — 다운로드조차 없음 |
+| **Claude Code · Gemini CLI · Codex CLI** | 첫 실행 시 동봉 npm으로 **자동 설치**(백그라운드·1회·멱등) |
+
+수동 실행·재시도는 `CalebBible install-clis`(`--only claude,codex` · `--force`), 끄려면
+`CALEBBIBLE_NO_CLI_AUTOINSTALL=1`. 각 CLI의 **계정 로그인은 사용자가 직접** 해야 합니다.
+
+설치·제거 상세는 [docs/INSTALL.md](docs/INSTALL.md), 사용법 전체는
+[User Manual](USER-MANUAL.md).
+
+## 빠른 시작
+
+```bash
+CalebBible identify                                  # 내 surface 주소 확인
+CalebBible launch-agent --role worker --agent claude # 역할 노드 기동(절대지침 자동 주입)
+CalebBible send --to worker "상태 보고해줘"            # 역할 주소로 push
+CalebBible send-key --to worker Return               # 전송 확정
+CalebBible status --json                             # 전 노드 1콜 스냅샷
+CalebBible events --reconnect                        # 이벤트 푸시 구독 (폴링 대체)
+CalebBible run --scoped -- python -m http.server     # 생명주기 관리되는 스코프드 실행
+CalebBible boot                                      # 표준 노드 세트 일괄 기동(설치된 CLI 자동 감지)
+```
+
+## 구조
+
+```
+CalebBible.app  Tauri 데스크톱 앱: 터미널 UI(xterm.js) + Control Center — 데몬의 thin client
+CalebBibled     헤드리스 코어 데몬: NDJSON 소켓 서버(UDS / win named pipe), PTY(portable-pty:
+         macOS openpty·Windows ConPTY), vt100 화면 재구성, 이벤트 버스, watchdog,
+         프로세스 원장, 사용량/비용 수집기, 영속 분석(SQLite), 스케줄러
+CalebBible      CLI: pane 안의 AI가 쓰는 동등 노드 클라이언트 (60+ 서브커맨드 — `CalebBible actions`)
+pack     CalebBible-pack/: 절대지침 6·결정론 도구 56·훅 18·스킬 102·스키마 3
+         (빌드 시 임베드 · minisign 서명 배포 · 사용자 수정 파일 불가침)
+```
+
+모든 pane 프로세스에 `CALEBBIBLE_SURFACE_ID`·`CALEBBIBLE_SURFACE_REF`·`CALEBBIBLE_SOCKET` 자동 주입 —
+pane 안의 AI는 `CalebBible identify`로 자기 주소를 즉시 안다. PTY는 데몬 소유라서 앱을
+재시작·재설치·업데이트해도 세션은 살아 있다(재attach).
+
+## CalebBible 팩 — 내장 멀티에이전트 운영체계
+
+터미널을 설치하고 AI CLI를 연결하면 **master–worker–CSO–reviewer 멀티에이전트 운영체계**가
+바로 구동됩니다. 시스템은 3층입니다:
+
+| 층 | 내용 | 출처 |
+|---|---|---|
+| 코어 (기계 기능) | 양방향 소켓·승인 Feed·watchdog/원장·이벤트 push·세션 영속 | CalebBible 코어 |
+| CalebBible 팩 | 역할별 절대지침·결정론 운영 도구·훅·스킬 | `CalebBible init-pack` |
+| 개인 층 | soul.md(우선순위·금지선)·장기기억 | **사용자가 사용하며 축적** |
+
+soul.md와 memory/는 **의도적으로 비어 있는 골격**입니다 — "운영 취향과 장기기억은 빌려
+쓰는 것이 아니라 사용자 자신이 채워가는 것"이라는 설계 철학입니다. 자율주행(승인된 로드맵
+자율 완주)은 오너가 soul.md에 명시적으로 부여할 때만 켜지며, **오너의 어떤 입력이든
+즉시 일시정지시키는 kill-switch**가 최우선입니다.
+
+상세: [Architecture & Philosophy](ARCHITECTURE-AND-PHILOSOPHY.md) §2–4,
+운용법: [User Manual](USER-MANUAL.md) §12.
+
+### 동봉 스킬 215종 — 설치자가 알아야 할 것
+
+팩에는 스킬 215종이 동봉되고, 노드를 띄우면 **에이전트가 목록을 자동으로 인지**합니다
+(별도 설치·등록 절차 없음). 다만 한국 생활·업무 스킬 일부는 다음을 전제로 합니다.
+
+- **API 키가 필요한 스킬이 있습니다.** `KSKILL_*` 환경변수 22종을 각자 발급받아 넣어야
+  동작합니다. 키가 없으면 그 스킬만 쓸 수 없을 뿐 나머지 기능에는 영향이 없습니다.
+- **48종은 외부 운영자 프록시**(`k-skill-proxy.nomadamas.org`)를 기본 경로로 씁니다 —
+  질의가 제3자 서버를 경유한다는 뜻입니다. `KSKILL_PROXY_BASE_URL` 로 자가 호스팅
+  엔드포인트를 지정하면 우회할 수 있습니다.
+- **예약 사이트 계정 자격증명을 요구하는 스킬이 있습니다**(KTX·자연휴양림 등의 ID/비밀번호).
+  쓰지 않을 스킬이라면 해당 환경변수를 비워두면 됩니다.
+
+출처·보안 스캔 결과·채택 이력은 [skills/THIRD_PARTY.md](CalebBible-pack/skills/THIRD_PARTY.md).
+
+## 세 가지 사용 구성 비교 — 온보딩 없이도 무엇을 얻는가
+
+CalebBible은 갈렙 온보딩 없이 **그냥 claude만 연결해도** 전통 터미널과 다른 경험을 제공합니다.
+세 구성을 33항목 × 6영역으로 비교한 결과입니다 (2026-07-17 신선 기계 E2E 실측 + 배포 코드 v0.12.77 추적 기반):
+
+- **①** 전통 터미널(iTerm 등) + claude CLI
+- **②** CalebBible + 순정 claude (갈렙 온보딩 없이 일상 사용)
+- **③** CalebBible + 갈렙 온보딩 ("갈렙시작" 선언 → 5노드 풀 시스템, **기준**)
+
+기호: **✕** 없음/불가 · **△** 부분/조건부 · **○** 제공 · **◎** 강화 체계 · **[실측]** 신선 기계 E2E 직접 확인
+
+### A. 설치·시작 경험
+
+| 항목 | ① 전통 터미널 + claude | ② CalebBible + 순정 claude | ③ CalebBible + 갈렙 (기준) |
+|---|---|---|---|
+| 자동 배치 | ✕ | ○ 팩 334파일+격리 config [실측] | ○ 동일 + preflight 전체 배선 |
+| 개인 `~/.claude` 보호 | — (직접 사용) | ○ 불가침 [실측] | △ base 온보딩 시 계장 가능 |
+| Claude 첫기동 게이트 | △ 5단 다이얼로그 1회 | △ 동일 — 첫 스킬런 막힘(F1) [실측] | △ 동일 함정 |
+| 로그인 | △ 1회 | △ 격리 config 별도 1회(F2) [실측] | △ 프로필별 각 1회 |
+| 온보딩 절차 | ✕ | ✕ 즉시 사용 (승격 문만 대기) | ○ 선언 → 5노드 부트 |
+
+### B. 세션 컨텍스트 — claude가 알고 시작하는 것
+
+| 항목 | ① 전통 터미널 | ② CalebBible + 순정 | ③ CalebBible + 갈렙 |
+|---|---|---|---|
+| 자동 주입 지침 | ✕ | ○ CalebBible 치트시트+4대 지침+품질 게이트 | ◎ 디렉티브+soul 전문 |
+| 시작 주입량 | 0 | ~1.4KB [실측] | ~134KB [실측] |
+| 등록 훅 수 | 0 | 2개 [실측] | 10개+ [실측] |
+| 권한 모드 | 사용자 선택 | 사용자 선택 | bypass + guard 짝 |
+
+### C. 에이전트 능력 — claude가 할 수 있는 것
+
+| 항목 | ① 전통 터미널 | ② CalebBible + 순정 | ③ CalebBible + 갈렙 |
+|---|---|---|---|
+| 타 pane 관측 | ✕ 서로 존재 모름 | ○ `CalebBible list`·`read-screen` 자발 사용 실증 [실측] | ◎ 능동 모니터링 체계 |
+| pane 간 메시지 | ✕ | ○ `CalebBible send --surface` 자발 사용 실증 [실측] | ◎ 역할 주소·양방향 소켓 |
+| GUI 승인 요청 | ✕ 터미널 프롬프트뿐 | ○ `CalebBible feed push --wait` | ◎ 승인 자동화 체계 |
+| 이벤트 push 구독 | ✕ 폴링뿐 | ○ `CalebBible events` | ◎ EVT v1 계약 12종 |
+| 서버 생명주기 | ✕ 수동 | ○ `CalebBible run --scoped` | ◎ + 사전 자원 게이트 |
+| 예약·웨이크업 | ✕ OS cron 수동 | ○ `CalebBible schedule` | ◎ 자율주행 웨이크업 |
+| 역할 주소 통신 | — | ✕ | ○ master·cso·worker·reviewer |
+
+### D. 환경 서비스 — 데몬이 묻지 않고 주는 것
+
+| 항목 | ① 전통 터미널 | ② CalebBible + 순정 | ③ CalebBible + 갈렙 |
+|---|---|---|---|
+| 컨텍스트% 관측 | ✕ | ○ usage-register 자동 [실측] | ◎ + 60% /clear 관리 |
+| 폭주·중복 서버 감지 | ✕ | ○ watchdog 전 surface | ◎ + 착수 전 게이트 |
+| 크래시·좀비 감지 | ✕ | ○ 자동 | ◎ + 노드 복구 |
+| pane 영속·복원 | △ 앱에 따라 | ○ phoenix [실측] | ◎ + 3층 복원 체계 |
+| 부서·워크스페이스 GUI | ✕ | ○ | ◎ 조직 단위 운영 |
+| 무중단 업데이트 | — | ○ | ○ |
+
+### E. 스킬·지식 자산
+
+| 항목 | ① 전통 터미널 | ② CalebBible + 순정 | ③ CalebBible + 갈렙 |
+|---|---|---|---|
+| 스킬 보유 | ✕ 수동 설치 | ○ 107종 + 보드 6종 [실측] | ◎ + 프로필 설치·role 주입 |
+| 스킬 실행 | ✕ 수동 호출 | ○ 보드 → 75초 완주 [실측] | ◎ + 티켓·게이트·검증 |
+| MCP 등록 | ✕ 수동 | ✕ | ○ 자동 (serena·nlm) |
+| 장기기억 | ✕ | ✕ | ○ CalebBible_memory + 훅 |
+| 박사님 SOT 연동 | ✕ | ✕ | ○ NotebookLM 의무 |
+
+### F. 조직·자율성 — 갈렙 온보딩의 고유 가치
+
+| 항목 | ① 전통 터미널 | ② CalebBible + 순정 | ③ CalebBible + 갈렙 |
+|---|---|---|---|
+| 팀 구성 | ✕ | ✕ (선언 1문장 승격 가능) | ○ 5노드 자동 |
+| 위임·검증 루프 | ✕ | ✕ | ○ 티켓·리뷰어·RSI·eval |
+| 세션 간 작업 복원 | ✕ | △ pane 수준만 | ○ SESSION_STATE·RECOVERY |
+| 자율주행 | ✕ | ✕ | ○ 4자 수렴·denylist 경계 |
+| 안전 게이트 | △ Claude 기본 | △ 기본 (+실행물만 워커 규율) | ◎ guard·grill·skillscan |
+| 진행 보고·관제 | ✕ | ✕ | ○ report·HUD·Feed |
+
+> **F1** = Claude Code 자체 첫기동 다이얼로그 5단(Enter→보안 노트→터미널 설정→폴더 신뢰→bypass 경고)에서
+> 최초 1회 사람 통과 필요. **F2** = 격리 config는 Keychain 자격증명이 config 경로별로 분리되어
+> (`Claude Code-credentials-<sha256(경로)[:8]>`) 자체 `/login` 1회 필요.
+
+**한 줄 독법** — ①→②는 **설치만으로 생기는 격차**(관측·통신·보호·스킬: 전통 터미널엔 범주 자체가 없음),
+②→③은 **조직·기억·자율성의 격차**(갈렙 고유 가치, F영역). ②의 실질 마찰은 1회성 게이트 2개(F1·F2)뿐이며,
+②에서 ③으로는 **"갈렙시작" 선언 한 문장**으로 승격됩니다.
+
+## Control Center (실시간 관제 + 영속 분석)
+
+앱의 전용 풀 패널 — CalebBibled가 단일 RPC로 플릿·사용량·시스템을 제공하고(외부 대시보드 무의존),
+영속 분석은 CalebBibled 내장 SQLite(`analytics.db` · open 실패 시 graceful degrade)에 쌓입니다.
+철학: **로컬 우선**(데이터가 머신 밖으로 나가지 않음) · 추가 인프라 0 · 에이전트 0ms
+지연(hook은 fire-and-forget).
+
+| 탭 (9) | 내용 |
+|---|---|
+| **Live** | 노드 플릿 · 하드웨어(CPU 코어별·GPU·NPU·MEM 2초 실시간) · 오늘 토큰/비용/모델믹스 · 경보 스트립 |
+| **비용·효율** | 영속 집계 — 토큰 4분해 · 모델별 비용(단가미상 표시) · 캐시 절감·재사용율 · 조직단위 비용 |
+| **스킬·에이전트** | 스킬/툴/위임 호출 집계 · 실패율(exit_code≠0) · 반복 실패 |
+| **세션** | 세션 타임라인 · 활동 리본 · 전사 발췌 드릴다운 · ⭐즐겨찾기 · 🔒PII 가림 |
+| **추세·주간** | 주간 WoW% 델타 · 효율 리더 · 스킬 자산(신규/휴면) |
+| **학습** | 자기개선(RSI) 라운드 타임라인 · 채택/롤백 · 발견 누적 |
+| **스킬 보드** | 큐레이션 스킬 버튼 클릭 = 일회용 워커 실행(HITL 미리보기) |
+| **작업** | 모든 부서×노드의 현재 업무(관측 전용) · 자기보고/파생 신뢰 배지 |
+| **승인 Feed** | 승인 요청 집중 처리(Allow/Deny) |
+
+그 밖에: ⌘K Command Palette(노드 점프·60% 컨텍스트 순회·승인 처리) · Glance 모드(⌘G,
+비기술자용 요약 화면) · 워크스페이스 그룹 · **부서**(독립 데몬으로 프로젝트 격리) ·
+RBAC PII 가림(`CALEBBIBLE_CONTROL_REDACT=1`). 상세 설계: docs/CONTROL_CENTER_DESIGN.md
+
+## 갈렙 네이티브 기능 (19건)
+
+> 설계 철학: **지침이 오케스트레이터에게 수동으로 시키는 모든 운영 의무 = 터미널의 기능 결함 목록.**
+> ①규약→데몬 보증으로 기계화 ②자기보고 우선·화면 파싱은 fallback ③자동화 3단 안전등급(alert→escalate→act, deny-by-default).
+
+| # | 기능 | 명령/이벤트 |
+|---|---|---|
+| T1-1 | **자기보고**: 에이전트가 상태·컨텍스트%·작업을 직접 신고 | `CalebBible set-status --state working --context 57` → `status.changed` |
+| T1-2 | **관제 보드**: 전 노드 1콜 요약 | `CalebBible status [--json]` · `CalebBible fleet`(전 부서) |
+| T1-3 | **발신자 신원·ACL**: 커널 peer pid로 from 검증 + role→role 송신 정책 | `acl.json` · 거부 시 `acl.denied` |
+| T2-4 | **컨텍스트 사이클 집행기**: 저장 지시→파일 게이트→clear→지침 재주입→재개 | `CalebBible cycle-agent --role worker` |
+| T2-5 | **에이전트 사망 즉시 감지** (+옵션 자동 재기동, 인증 오류 시 차단) | `agent.exited/recovered` · `CalebBible node-recover --role X` |
+| T2-6 | **조직 복원**: 토폴로지 영속 + 일괄 재기동·재주입 | `CalebBible restore [--include-master]` |
+| T2-7 | **디렉티브 드리프트 감지·재주입** | `CalebBible reinject --role X [--check]` |
+| T2-8 | **오케스트레이터 dead-man**: 단일 장애점 봉합 | `master.deadman` 이벤트 |
+| T3-9 | **todo 워치**: 역할별 TODO 파일 mtime 감시→진행률 집계 | `todo.updated` · `CalebBible todo-path` |
+| T3-10 | **원샷 타이머** (+fresh TTL `--close-after`) | `CalebBible schedule add --id x --in 20m --text ... --to role` |
+| T3-11 | **역할 글롭 브로드캐스트** | `CalebBible send --to 'reviewer-*' "..."` |
+| T3-12 | **feed aging 재알림**: pending 승인 무음 적체 차단 | `feed.item.aging` |
+| T3-13 | **입력 안전**: 타이핑 가드 · 원자 권위 전달 | `typing_guard` 거부 |
+| T3-14 | **델타 읽기·완료 대기**: 단조 라인 커서 + 데몬측 regex 감시 | `CalebBible read-screen --since N` · `CalebBible watch --until <re>` |
+| T4-15 | **kill-switch**: 큐 배달·스케줄 발화 동결 | `CalebBible pause/resume` · `CalebBible gate-check` |
+| T4-16 | **승인 격상**: 화면 스캔→이벤트+feed (자동 응답 절대 없음) | `approval.request` |
+| T4-17 | **헬스룰 조치 바인딩**(opt-in): queued 배달만 일시정지 | `CalebBible add-health-rule n p --action pause-queue` |
+| T4-18 | **트랜스크립트 해시체인 attest**: 변조 증거성(producer≠evaluator) | `CalebBible attest pin/verify` |
+| T4-19 | **recall 보존 정책**: 트랜스크립트 무한 성장 차단 | `CALEBBIBLE_RECALL_RETAIN_DAYS` |
+
+## 자원 거버넌스 (3대 완화책)
+
+| 완화책 | 기능 | 명령/이벤트 |
+|---|---|---|
+| ① 로그인 감지 강화 | 모든 출력 라인에 헬스 룰(기본: Not logged in·401·token expired·rate limit) 매칭 → 30초 디바운스 push | `health.alert` · `CalebBible add-health-rule <name> <regex>` |
+| ② 짧은 작업 단위 | idle(기본 300초 무출력) 감지 push → 분할·점검 판단 | `pane.idle` 이벤트 |
+| ③ 서버 생명주기 강제 종료 | **scoped 실행**(새 프로세스 그룹+원장, 종료 시 그룹째 정리) · **close-surface**(자식 트리 전멸) · **watchdog**(load/자식 수/중복 명령 감지) | `CalebBible run -- <cmd>` · `CalebBible ps` · `CalebBible kill <pid>` · `watchdog.*` |
+
+## 승인 Feed · 인플라이트 큐
+
+```bash
+CalebBible feed push --wait --title "git push 승인" --body "..."   # 결정까지 블록 (exit 0=allow, 2=deny, 3=timeout)
+CalebBible feed reply <request_id> allow                            # CLI 또는 UI Allow/Deny 버튼
+```
+
+자동 응답은 없습니다(HITL) — 요청 노드의 자기결재도 데몬이 거부합니다. 반복 위험 명령은
+`CalebBible approval sign`(master 전용, HMAC signed-prefix)으로 1회 서명해 통과시킵니다.
+
+- 기본 전송(`CalebBible send`)=**steer**: 즉시 stdin 주입 — 실행 중 입력을 조향으로 소화.
+- `CalebBible send --queued`=**followup**: 대상이 3초 이상 조용해지면 한 틱에 한 건씩 자동 배달.
+
+## 업데이트 — 이중 채널 + 무중단
+
+| 배지 | 채널 | 방식 |
+|---|---|---|
+| `!` | 앱(바이너리) | Tauri updater 서명 검증 → 세션 가드 → 설치·재시작 → 팩 반영+노드 자동 복귀 |
+| `↻` | 팩(운영체계) | **무중단** — minisign 검증 → 원자 트랜잭션 → 라이브 노드 재주입. 재시작 0, 세션·데몬 생존 |
+
+시작 시 + 6시간마다 조용히 확인. 재설치 후 "디스크는 새 버전·프로세스는 구 데몬" 스큐가
+남으면 배지 클릭 교대 또는 유휴 자동 교대(라이브 세션 0일 때 — 무손실)로 해소됩니다.
+진단·수리는 `CalebBible doctor [--fix]`.
+
+**커스터마이즈와 공존**: 사용자 수정본은 업데이트가 파괴하지 않습니다 — user-owned 파일은
+보존+신버전 `.new` 병치, system 파일은 치유 전 `.user` 보존, `~/.CalebBible/local/` 오버레이
+(디렉티브 append·스킬 shadowing·훅 후행)는 업데이트가 존재 자체를 모릅니다.
+`CalebBible pack-plan`(사전 미리보기) · `CalebBible pack-merge`(3-way/AI 병합) — 상세는
+[User Manual §12.7](USER-MANUAL.md#127-커스터마이징--업데이트와-공존하는-방법).
+
+## 채널 브리지 (Slack·Discord)
+
+함대의 승인 요청·보고를 외부 메신저로 내보내고, 허가된 발신자의 원격 승인을 받습니다 —
+발신자 allowlist · 원격 승인 별도 허가 · 즉시 잠금(lockdown) · 모양 기반 redact 내장.
+`CalebBible channel status` 참조.
+
+## 프로토콜 · 환경변수
+
+NDJSON(한 줄 = JSON 하나), RPC 60여 개 + `channel.*` 13종, 이벤트 60여 종.
+전수 목록과 환경변수 표는 [User Manual §16–17](USER-MANUAL.md)에 있습니다.
+
+## 소스 빌드 (기여 시)
+
+```bash
+git clone https://github.com/choijinyi/Ezer
+cargo build --release
+./target/release/CalebBibled &                      # 데몬 (중복 기동 자동 거부)
+
+cd ui && sh build.sh                          # 프런트엔드 번들 (bun)
+cargo build -p CalebBible-app                        # dev 실행: ./target/debug/CalebBible-app
+bun x @tauri-apps/cli build                   # 배포 번들
+```
+
+주의: ui/ 수정 후 앱 재빌드 필요(프런트엔드가 바이너리에 임베드됨). 세션(PTY)은 데몬 소유 —
+UI 재시작·앱 재설치에도 세션 유지(재attach).
+
+## 보안 모델
+
+- 네트워크 리스너 없음 — 사용자 소유 Unix 소켓(macOS) / DACL 봉인 named pipe(Windows)만.
+- 발신자 신원은 커널 peer pid로 검증(자기신고 불신) · role→role ACL · 능력 게이트는
+  deny-by-default(리뷰어는 읽기 전용).
+- 업데이트 이중 서명 — 앱은 Tauri updater 서명, 팩은 minisign(공개키 바이너리 핀·replay
+  단조성·fail-closed).
+- 승인 자동응답 없음(HITL) · 자기결재 차단 · 외부 URL은 하드 허용목록(로컬 설정으로만 확장).
+- 발행 전 비밀/PII 게이트: `scripts/secret-scan.sh --all` (fail-closed).
+
+취약점 신고: [SECURITY.md](SECURITY.md) · 상세: [Architecture & Philosophy §6](ARCHITECTURE-AND-PHILOSOPHY.md)
+
+## 알려진 한계
+
+- macOS에서 sysinfo가 cmdline 전체를 못 읽으면 프로세스명으로 중복 그룹핑(과탐 가능).
+- `CalebBible run` 중 Ctrl-C로 CLI가 죽으면 그룹 정리가 watchdog 주기(5초)로 넘어감.
+- Control Center의 GPU/NPU 실시간은 현재 macOS(Apple Silicon) 전용 — Windows는 CPU/MEM만.
+- NPU는 활용률(%) 공개 API가 없어 실측 전력(W)으로 표시(macOS).
+- 단일-UID 신뢰 모델 — 승인 서명·자기결재 차단은 같은 계정 내 악성 프로세스에 대한
+  암호학적 방어가 아니라 탐지·fail-safe 층입니다.
+
+## 기여 · 라이선스
+
+기여는 [CONTRIBUTING.md](CONTRIBUTING.md), 서드파티 귀속은 [NOTICE.md](NOTICE.md) 참조.
+MIT License ([LICENSE](LICENSE)) · 문의: **ezer.agent@gmail.com**
