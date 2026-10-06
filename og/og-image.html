@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>박태복 OG 이미지</title>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-bg: #f9b862;
+    --color-text: #2a0656;
+    --color-accent: #0f7b79;
+    --color-surface: #fdf3e3;
+    --color-on-accent: #ffffff;
+    --color-line: rgba(42, 6, 86, 0.18);
+    --color-muted: rgba(42, 6, 86, 0.72);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    font-family: "Gowun Dodum", sans-serif; font-weight: 400;
+    background: var(--color-bg); color: var(--color-text);
+    word-break: keep-all; overflow: hidden; position: relative;
+  }
+  .card {
+    position: absolute; inset: 48px;
+    background: var(--color-surface); border: 1px solid var(--color-line);
+    border-radius: 28px; padding: 56px 72px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .label { font-size: 22px; letter-spacing: 0.06em; color: var(--color-muted); }
+  .title { font-size: 60px; line-height: 1.3; letter-spacing: -0.02em; margin-top: 18px; }
+  .sub { font-size: 28px; line-height: 1.5; color: var(--color-muted); margin-top: 22px; }
+  .foot { display: flex; align-items: center; justify-content: space-between; }
+  .name { font-size: 40px; letter-spacing: -0.01em; }
+  .name small { display: block; font-size: 20px; color: var(--color-muted); letter-spacing: 0.04em; margin-top: 6px; }
+  .tags { display: flex; gap: 12px; }
+  .tag { font-size: 20px; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--color-line); }
+  .tag.now { background: var(--color-accent); color: var(--color-on-accent); border-color: var(--color-accent); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div>
+      <p class="label">AI융합 진로교육 설계자</p>
+      <h1 class="title">AI는 쓸 줄 아는데,<br>진로와는 왜 이어지지 않을까요?</h1>
+      <p class="sub">현장 실습 중심의 AI융합 수업 설계로 첫걸음을 함께 내딛습니다.</p>
+    </div>
+    <div class="foot">
+      <p class="name">박태복<small>AI융합교육 · 진로설계 · 교육 컨설팅</small></p>
+      <div class="tags"><span class="tag now">첫걸음 내딛기</span></div>
+    </div>
+  </div>
+</body>
+</html>
